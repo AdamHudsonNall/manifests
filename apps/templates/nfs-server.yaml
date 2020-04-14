@@ -17,7 +17,7 @@ spec:
     helm:
       values: |
         persistence:
-          enabled: false
+          enabled: true
           storageClass: "-"
           size: 200Gi
         storageClass:
