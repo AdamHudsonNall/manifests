@@ -22,3 +22,18 @@ spec:
           defaultClass: true
         nodeSelector:
           kubernetes.io/hostname: k8-n1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: data-nfs-server-provisioner-0
+spec:
+  capacity:
+    storage: 10T
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/sdb/data-nfs-server-provisioner-0
+  claimRef:
+    namespace: kube-system
+    name: data-nfs-server-provisioner-0
