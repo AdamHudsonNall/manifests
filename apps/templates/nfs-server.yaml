@@ -17,9 +17,9 @@ spec:
     helm:
       values: |
         persistence:
-          enabled: true
-          storageClass: "-"
-          size: 10T
+          enabled: false
+#          storageClass: "-"
+#          size: 10T
         storageClass:
           defaultClass: true
         nodeSelector:
