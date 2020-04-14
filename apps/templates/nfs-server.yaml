@@ -18,6 +18,8 @@ spec:
       values: |
         persistence:
           enabled: false
+          storageClass: "-"
+          size: 200Gi
         storageClass:
           defaultClass: true
         nodeSelector:
@@ -28,10 +30,11 @@ kind: PersistentVolume
 metadata:
   name: data-nfs-server-provisioner-0
 spec:
+  storageClassName: nfs
   capacity:
-    storage: 10T
+    storage: 200Gi
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   hostPath:
     path: /mnt/sdb/data-nfs-server-provisioner-0
   claimRef:
