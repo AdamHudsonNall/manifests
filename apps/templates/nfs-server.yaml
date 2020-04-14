@@ -18,7 +18,7 @@ spec:
       values: |
         persistence:
           enabled: true
-          storageClass: "-"
+          storageClass: nfs
           size: 200Gi
         storageClass:
           defaultClass: true
