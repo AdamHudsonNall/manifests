@@ -39,4 +39,4 @@ spec:
     path: /mnt/sdb/data-nfs-server-provisioner-0
   claimRef:
     namespace: kube-system
-    name: data-nfs-server-provisioner-0
+    name: data-nfs-server-nfs-server-provisioner-0
