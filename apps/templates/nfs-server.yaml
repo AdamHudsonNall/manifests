@@ -40,3 +40,11 @@ spec:
   claimRef:
     namespace: kube-system
     name: data-nfs-server-nfs-server-provisioner-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - k8-n1

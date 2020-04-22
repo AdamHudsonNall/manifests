@@ -1,0 +1,7 @@
+apiVersion: v1
+description: Distribution of Fluentd as K8S daemonset
+home: https://github.com/vmware/kube-fluentd-operator
+name: log-router
+sources:
+- https://github.com/vmware/kube-fluentd-operator
+version: 0.3.2
