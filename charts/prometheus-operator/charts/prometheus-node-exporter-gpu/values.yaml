@@ -88,9 +88,8 @@ podLabels: {}
 
 ## Assign a nodeSelector if operating a hybrid cluster
 ##
-nodeSelector: {}
-#   beta.kubernetes.io/arch: amd64
-#   beta.kubernetes.io/os: linux
+nodeSelector:
+  hardware-type: NVIDIAGPU
 
 tolerations:
   - effect: NoSchedule
@@ -130,10 +129,6 @@ sidecars:
     securityContext:
       runAsNonRoot: false
       runAsUser: 0
-    volumes:
-    - name: collector-textfiles
-      emptyDir:
-        medium: Memory
 
 ## Volume for sidecar containers
 ##

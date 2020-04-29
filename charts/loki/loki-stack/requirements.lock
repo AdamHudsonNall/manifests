@@ -1,0 +1,18 @@
+dependencies:
+- name: loki
+  repository: file://../loki
+  version: 0.28.1
+- name: promtail
+  repository: file://../promtail
+  version: 0.22.0
+- name: fluent-bit
+  repository: file://../fluent-bit
+  version: 0.1.1
+- name: grafana
+  repository: https://kubernetes-charts.storage.googleapis.com/
+  version: 3.8.19
+- name: prometheus
+  repository: https://kubernetes-charts.storage.googleapis.com/
+  version: 9.3.3
+digest: sha256:f3659b3ea5f8dda1e2d0bced31a5d234e4cebfd50c2b905478115f7fd066d7fd
+generated: "2020-04-23T14:23:02.142743-05:00"
