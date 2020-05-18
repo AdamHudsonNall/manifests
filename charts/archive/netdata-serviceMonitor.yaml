@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: netdata-metrics-servicemonitor
+  namespace: default
+  labels:
+    app: netdata
+    release: prometheus
+    jobLabel: netdata
+spec:
+  selector:
+    matchLabels:
+      app: netdata
+  endpoints:
+  - port: http
+    path: /api/v1/allmetrics?format=prometheus
+    interval: 10s
+
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: netdata-metrics-podmonitor
+  labels:
+    app: netdata
+    release: prometheus
+    jobLabel: netdata
+spec:
+  selector:
+    matchLabels:
+      app: netdata
+  podMetricsEndpoints:
+  - port: http
+    path: /api/v1/allmetrics?format=prometheus
+    interval: 10s
