@@ -1,7 +1,7 @@
 acceptEula:
-  value: "n"
+  value: "y"
 edition:
-  value: Express
+  value: Standard
 collation: SQL_Latin1_General_CP1_CI_AS
 lcid: 1033
 hadr: 0
@@ -46,7 +46,7 @@ persistence:
   # existingTransactionLogClaim:
   # existingBackupClaim:
   # existingMasterClaim:
-  storageClass: ""
+  storageClass: "longhorn"
   dataAccessMode: ReadWriteOnce
   dataSize: 1Gi
   transactionLogAccessMode: ReadWriteOnce

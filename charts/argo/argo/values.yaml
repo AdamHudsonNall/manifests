@@ -4,7 +4,8 @@ images:
   server: argocli
   executor: argoexec
   pullPolicy: Always
-  tag: v2.6.1
+  tag: latest
+  # tag: v2.8.0
 
 crdVersion: v1alpha1
 installCRD: true
@@ -26,7 +27,7 @@ controller:
   podLabels: {}
   # podPortName: http
   metricsConfig:
-    enabled: false
+    enabled: true
     path: /metrics
     port: 8080
     persistence: {}
@@ -52,13 +53,13 @@ controller:
     path: /telemetry
     port: 8081
   serviceMonitor:
-    enabled: false
+    enabled: true
     additionalLabels: {}
   serviceAccount: argo
   name: workflow-controller
   workflowNamespaces:
     - default
-  containerRuntimeExecutor: docker
+  containerRuntimeExecutor: pns
   instanceID:
     # `instanceID.enabled` configures the controller to filter workflow submissions
     # to only those which have a matching instanceID attribute.
@@ -173,7 +174,7 @@ server:
     #       - argo.domain.com
 
 # Influences the creation of the ConfigMap for the workflow-controller itself.
-useDefaultArtifactRepo: false
+useDefaultArtifactRepo: true
 useStaticCredentials: true
 artifactRepository:
   # archiveLogs will archive the main container logs as an artifact
@@ -182,14 +183,14 @@ artifactRepository:
     # Note the `key` attribute is not the actual secret, it's the PATH to
     # the contents in the associated secret, as defined by the `name` attribute.
     accessKeySecret:
-      # name: <releaseName>-minio (default)
+      name: minio
       key: accesskey
     secretKeySecret:
-      # name: <releaseName>-minio
+      name: minio
       key: secretkey
     insecure: true
-    # bucket:
-    # endpoint:
+    bucket: argo
+    endpoint: minio.default.svc.cluster.local:9000
 
 # NOTE: These are setting attributes for the `minio` optional dependency
 minio:

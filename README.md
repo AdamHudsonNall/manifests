@@ -17,6 +17,14 @@ https://github.com/banzaicloud/logging-operator
 https://banzaicloud.com/docs/one-eye/logging-operator/fluentbit/
 https://github.com/NVIDIA/gpu-monitoring-tools
 https://rook.io/docs/rook/v1.3/ceph-quickstart.html
+https://longhorn.io/docs/0.8.0/getting-started/quick-start-with-helm/
+https://github.com/milvus-io/milvus-helm
+https://milvus.io/docs/v0.9.0/about_milvus/overview.md
+https://marquezproject.github.io/marquez/
+https://github.com/mlflow/mlflow
+https://github.com/mlrun/mlrun
+https://github.com/K-Phoen/dark
+https://github.com/argoproj/argo/blob/f33624d67d0cf348dcdece46832081346c26bf80/examples/volumes-emptydir.yaml
 
 ## kubeVirt
 
