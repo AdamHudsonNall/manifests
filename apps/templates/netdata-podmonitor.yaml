@@ -7,9 +7,12 @@ metadata:
     release: prometheus
     jobLabel: netdata
 spec:
-  selector:
+  namespaceSelector:
+    any: true
+  selector:    
     matchLabels:
       app: netdata
+      release: netdata
   podMetricsEndpoints:
   - port: http
     path: /api/v1/allmetrics?format=prometheus

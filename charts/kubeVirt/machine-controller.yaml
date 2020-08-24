@@ -1,0 +1,515 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: machines.cluster.k8s.io
+  labels:
+    local-testing: "true"
+spec:
+  group: cluster.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    kind: Machine
+    plural: machines
+  additionalPrinterColumns:
+  - name: Provider
+    type: string
+    JSONPath: .spec.providerSpec.value.cloudProvider
+  - name: OS
+    type: string
+    JSONPath: .spec.providerSpec.value.operatingSystem
+  - name: Address
+    type: string
+    JSONPath: .status.addresses[0].address
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: machinesets.cluster.k8s.io
+  labels:
+    local-testing: "true"
+spec:
+  group: cluster.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    kind: MachineSet
+    plural: machinesets
+  subresources:
+     # status enables the status subresource.
+     status: {}
+  additionalPrinterColumns:
+  - name: Replicas
+    type: integer
+    JSONPath: .spec.replicas
+  - name: Provider
+    type: string
+    JSONPath: .spec.template.spec.providerSpec.value.cloudProvider
+  - name: OS
+    type: string
+    JSONPath: .spec.template.spec.providerSpec.value.operatingSystem
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: machinedeployments.cluster.k8s.io
+  labels:
+    local-testing: "true"
+spec:
+  group: cluster.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    kind: MachineDeployment
+    plural: machinedeployments
+  subresources:
+     # status enables the status subresource.
+     status: {}
+  additionalPrinterColumns:
+  - name: Replicas
+    type: integer
+    JSONPath: .spec.replicas
+  - name: Provider
+    type: string
+    JSONPath: .spec.template.spec.providerSpec.value.cloudProvider
+  - name: OS
+    type: string
+    JSONPath: .spec.template.spec.providerSpec.value.operatingSystem
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clusters.cluster.k8s.io
+  labels:
+    local-testing: "true"
+spec:
+  group: cluster.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    kind: Cluster
+    plural: clusters
+  subresources:
+     # status enables the status subresource.
+     status: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: machine-controller:kubelet-bootstrap
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:node-bootstrapper
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:bootstrappers:machine-controller:default-node-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: machine-controller:node-autoapprove-bootstrap
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:certificates.k8s.io:certificatesigningrequests:nodeclient
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:bootstrappers:machine-controller:default-node-token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: machine-controller
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: machine-controller
+  template:
+    metadata:
+      annotations:
+        "prometheus.io/scrape": "true"
+        "prometheus.io/port": "8085"
+        "prometheus.io/path": "/metrics"
+      labels:
+        app: machine-controller
+    spec:
+      serviceAccountName: machine-controller
+      containers:
+        - image: kubermatic/machine-controller:latest
+          imagePullPolicy: IfNotPresent
+          name: machine-controller
+          command:
+            - /usr/local/bin/machine-controller
+            - -logtostderr
+            - -v=3
+            - -worker-count=5
+            - -cluster-dns=10.10.10.10
+            - -internal-listen-address=0.0.0.0:8085
+            # Machines that fail to join the cluster within this timeout and
+            # are owned by a MachineSet will get deleted so the MachineSet
+            # controller re-creates them
+            - -join-cluster-timeout=25m
+          ports:
+          - containerPort: 8085
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8085
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8085
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: machine-controller-webhook
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: machine-controller-webhook
+  template:
+    metadata:
+      labels:
+        app: machine-controller-webhook
+    spec:
+      serviceAccountName: machine-controller
+      containers:
+        - image: kubermatic/machine-controller:latest
+          imagePullPolicy: IfNotPresent
+          name: webhook
+          command:
+            - /usr/local/bin/webhook
+            - -logtostderr
+            - -v=6
+            - -listen-address=0.0.0.0:9876
+          volumeMounts:
+            - name: machine-controller-admission-cert
+              mountPath: /tmp/cert
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9876
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9876
+              scheme: HTTPS
+            periodSeconds: 5
+      volumes:
+          - name: machine-controller-admission-cert
+            secret:
+              secretName: machine-controller-admission-cert
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: machine-controller-admission-cert
+  namespace: kube-system
+data:
+  "cert.pem": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM4akNDQWRxZ0F3SUJBZ0lJZTNpbE1WZTZpNE13RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TURBME1UQXhPVEUyTkRoYUZ3MHlNVEEwTVRBeE9URTJOVEphTURReApGekFWQmdOVkJBb1REbk41YzNSbGJUcHRZWE4wWlhKek1Sa3dGd1lEVlFRREV4QnJkV0psY201bGRHVnpMV0ZrCmJXbHVNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQXFVeEd4eVdUamt1MktGMXIKeEowVmRkUWxod0dHa3o0MDB2NHlVU1BVUlk2NStxREFpQVEzQTdUSXBVc0drY0FVQXF0R2pJaXBhd3g5VUc3egphSDFZZWpvL2dCQkxmcWYvQ1JDbldvcVJMT0VBTDVnRThOVzdXRExJajFiTmhFMFRVNWI5Yi9PUEd5VkdTV244CkVMYmt3Nk1DNEY5ME40cWdBVmp0L2NDWnh2L0tGY1pPaWdRWis5ZE1uOGtFd1BXcFBJK2hNUEVXVlR6L1RYM2YKditsNzV2blB4QXl6TTNRYnRjckVIcUVZL3dnckxlS3VTNTZ5TytVcEZ1eElCWDdpY2FHdzQ4dzg3cUVHNXlOWAp0YWhrVllCeWRUSWRhTzZ3K2Z3UVBQeHhvdDBoN0ZidFkwZStpVVRTaFZVQTRnME9WUHJRQlA2bnZSU3ZjdVVVCnNKYkJZUUlEQVFBQm95Y3dKVEFPQmdOVkhROEJBZjhFQkFNQ0JhQXdFd1lEVlIwbEJBd3dDZ1lJS3dZQkJRVUgKQXdJd0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFGVmlXZWNaTE5HSCtwVHJuYlJVMDhzQnJ6eGI3c3h1MTFLUAorOUdnSmU5R3dlck9VdnFLQk94MnFSTUUzV0hiajAyR05VcHRHY25wTkZXU3ZoN0dQWjZNN01uTXFhN0JaRE0vCmpWSW9oOGlhc09ZSlZvWktwNTVqQ0djVGFiK3NZWEdlVzhrdnRuaFduM2I5dWRIVUJHSk5vUUF5dHlTNXN6V20KY3kyNEp2cnpETFV4TWZQU0dhemxjbjhIVGN4THNkWW1iL3lNbjNkdU1Fcm5aNGNKTjN3MmNiZCtBT1Q5NVFvTgoxWis5VFJXZzJrZlplWmNvcDNiSlRNSDNEelhaeVcwL05VdHpibEVpeC9WeU0yV0U1N010eldUWXRyRDNJdUlICkIxMnlYOGhyVVN2SngzV1Y4SEU4UFAxSVVPUXhkWG10cXpkbG9zYVBxSklnMndkOGtZZz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+  "key.pem": "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBcVV4R3h5V1Rqa3UyS0YxcnhKMFZkZFFsaHdHR2t6NDAwdjR5VVNQVVJZNjUrcURBCmlBUTNBN1RJcFVzR2tjQVVBcXRHaklpcGF3eDlVRzd6YUgxWWVqby9nQkJMZnFmL0NSQ25Xb3FSTE9FQUw1Z0UKOE5XN1dETElqMWJOaEUwVFU1YjliL09QR3lWR1NXbjhFTGJrdzZNQzRGOTBONHFnQVZqdC9jQ1p4di9LRmNaTwppZ1FaKzlkTW44a0V3UFdwUEkraE1QRVdWVHovVFgzZnYrbDc1dm5QeEF5ek0zUWJ0Y3JFSHFFWS93Z3JMZUt1ClM1NnlPK1VwRnV4SUJYN2ljYUd3NDh3ODdxRUc1eU5YdGFoa1ZZQnlkVElkYU82dytmd1FQUHh4b3QwaDdGYnQKWTBlK2lVVFNoVlVBNGcwT1ZQclFCUDZudlJTdmN1VVVzSmJCWVFJREFRQUJBb0lCQVFDUG5EV1o3eVVwR3M1dApsVG02c2Vtblp3dGlaNGZwMVdYbjZWdHpldW94Q3U1MlRQQ2xNTFllUGJmS2gwY09VaHBuWFRUZU4zdEhaSFBVCnpCbE1kSytlRjFVUVpFSTJNWG5sRGF4NDRIeGZ6b2xpMWhpeTF3c3h1UHBxcFI1MjhRN0k1SmNkNVVScXFZYmkKOWJXdDFBZGdjU0lhaEw1SDh4N2hwYmRVZnBHenZKeElqR1pqaFhLaXdHbTR3c0tQUzRzc0lNYXE5eEZmMlEvZQpBc2N1SDRCaTdoTDhjVVdqM0kxTmNYV2lya0VFQU1Gd29EbzRuMmRINzVkaXozQUNvZ2c5eVF2aCtqWlVFMnJBCkx1V3RiaUlDZUMwL0lrWTYyRGx1TDcrd0Q4cW4raEhyTnZ1M2ZhcXRsK3BGTmhkZElKVWdVd1laV01BZnYyV3cKRFBBUDN6REJBb0dCQU16Q09XcFRVODlpeURMd1hxOTIyeG9IbktVWG0yWTJJM1Uva0JtZW1aejhLSlFMbW9LeQpOY25xZDBnNDhjWm42Tmc4ejBHdGZzK3E5bUJtdFZTVjlyQk1kTHZMOHNBczVhRDd2VHFmdzJEOHhmdm5UeVZuCjAzUExnbjk1b2JmOUU0S3p1elNvRCtVQUQ1RUpGbHhKV3p2Rmd5V2FNdVI5VUFDQVVYL1E1RVFwQW9HQkFOT3EKUnB5Z1UySGRrZ1pKNFRtNm1kUE90MUh2ZDkwcjdDRzNZYVEzTEVOcjl0QnhSRmpyNGZzN1BwNXJZa2k2NU8xaApBMkxaOC8zWlBVcVUxdUFNZWRSRlNNTm0wRnE2MkNJclpqdm1aVjBDcHgxWXhYVjdpenp1VlJxLzYrb00vVHJCCk9nK3dJTGYwczdZai9YMS8rSjhpSkZRMUN5OEs5aWdKTGRYNVgzcDVBb0dBQmhCMmpOeWM3ZFo2SVhBWERkRlMKV2VvQnpLM3ZUMDZwTEM3T3dNTit2elNFcXlYUTFMQWNnYmR0QXZtVXg1Q0tSK1U5S2kvT1FxNUlqOEJhL0g5WQppQTRyb3VnK2IweWxIR2g0U1VVMER5cE5YdEdSK1lTaXNacEVhaXdiQ3d6MngvYzB3ekY3RHdnNmJjdzhHazJkCjR4NU5iUTZ0RlRGVTdqN2Vxdzl2dzBrQ2dZRUFyVXZYSGp0aHFWbTRTYS9KVi9PQUtGc3gya0tldDVWVGNsTnEKL1FFekcweFV1bHBTSkIrVVdKWXI4WlpuMUxZMzRtWXdXSW1yNjJVbWVsNmNBcm9VTVFnOHg4Ynd4YWYrZHhOagpVNTJSMWZIckV1cndWL3k3aGpwM3NUdjdFaGhxWitWMS9Rd3Q3WTdLYUZEVkpTQldWU3VsNU0rOUJWb0xLY0pDCkpkTlRLYmtDZ1lBQWxFbGhZcWl3TjRLd1NjT3NDNHI0M1E2TnlVdWw5cmFQMTkvS0FBZXNKTVg0bGpjRGV0dFcKVnJOY1FhZU5pcXlIRm9NVzJBd2g2UGVXclBGWldYTm45R3c3aHJtaStZR0orQ0NmNzIwdWNrS1BRYnE4Y09lUApFOUZWSGd0U3A4MkVOclJNTUFEYUpwNkVFVVIyWWdVWkh4K2hTWnZENFJQcTJIU3ZPeEIrU0E9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo="
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: machine-controller-webhook
+  namespace: kube-system
+spec:
+  ports:
+  - name: 443-9876
+    port: 443
+    protocol: TCP
+    targetPort: 9876
+  selector:
+    app: machine-controller-webhook
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: machine-controller
+  namespace: kube-system
+  labels:
+    local-testing: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: machine-controller
+  namespace: kube-system
+  labels:
+    local-testing: "true"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - update
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  resourceNames:
+  - machine-controller
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: machine-controller
+  namespace: kube-public
+  labels:
+    local-testing: "true"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: machine-controller
+  namespace: default
+  labels:
+    local-testing: "true"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: machine-controller
+  namespace: kube-system
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: machine-controller
+subjects:
+- kind: ServiceAccount
+  name: machine-controller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: machine-controller
+  namespace: kube-public
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: machine-controller
+subjects:
+- kind: ServiceAccount
+  name: machine-controller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: machine-controller
+  namespace: default
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: machine-controller
+subjects:
+- kind: ServiceAccount
+  name: machine-controller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: machine-controller
+  labels:
+    local-testing: "true"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "events"
+  verbs:
+  - "create"
+  - "patch"
+- apiGroups:
+  - "apiextensions.k8s.io"
+  resources:
+  - "customresourcedefinitions"
+  verbs:
+  - "create"
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "apiextensions.k8s.io"
+  resources:
+  - "customresourcedefinitions"
+  resourceNames:
+  - "machines.machine.k8s.io"
+  verbs:
+  - "*"
+- apiGroups:
+  - "machine.k8s.io"
+  resources:
+  - "machines"
+  verbs:
+  - "*"
+- apiGroups:
+  - "cluster.k8s.io"
+  resources:
+  - "machines"
+  - "machinesets"
+  - "machinesets/status"
+  - "machinedeployments"
+  - "machinedeployments/status"
+  - "clusters"
+  - "clusters/status"
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - "nodes"
+  verbs:
+  - "*"
+# Pods are required for draining
+# PVs are required for vsphere to detach them prior to deleting the instance
+# Secrets and configmaps are needed for the boostrap token creation and when a ref is used for a
+# value in the machineSpec
+- apiGroups:
+  - ""
+  resources:
+  - "pods"
+  verbs:
+  - "list"
+  - "get"
+- apiGroups:
+  - ""
+  resources:
+  - "persistentvolumes"
+  - "secrets"
+  - "configmaps"
+  verbs:
+  - "list"
+  - "get"
+  - "watch"
+- apiGroups:
+  - ""
+  resources:
+  - "pods/eviction"
+  verbs:
+  - "create"
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: machine-controller
+  labels:
+    local-testing: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: machine-controller
+subjects:
+  - kind: ServiceAccount
+    name: machine-controller
+    namespace: kube-system
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: machinedeployments.machine-controller.kubermatic.io
+webhooks:
+- name: machinedeployments.machine-controller.kubermatic.io
+  failurePolicy: Fail
+  rules:
+  - apiGroups:
+    - "cluster.k8s.io"
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - machinedeployments
+  clientConfig:
+    service:
+      namespace: kube-system
+      name: machine-controller-webhook
+      path: /machinedeployments
+    # caBundle: __admission_ca_cert__
+- name: machines.machine-controller.kubermatic.io
+  failurePolicy: Fail
+  rules:
+  - apiGroups:
+    - "cluster.k8s.io"
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - machines
+  clientConfig:
+    service:
+      namespace: kube-system
+      name: machine-controller-webhook
+      path: /machines
+    # caBundle: __admission_ca_cert__

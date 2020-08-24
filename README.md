@@ -29,6 +29,8 @@ https://github.com/argoproj/argo/blob/f33624d67d0cf348dcdece46832081346c26bf80/e
 ## kubeVirt
 
 https://kubevirt.io/user-guide/#/README
+https://kubevirt.io/user-guide/#/installation/installation
+https://github.com/kubevirt/kubevirt/releases
 
 export KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases|grep tag_name|sort -V | tail -1 | awk -F':' '{print $2}' | sed 's/,//' | xargs | cut -d'-' -f1)
 wget  https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/kubevirt-operator.yaml
@@ -37,6 +39,9 @@ wget https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/
 kubectl apply -f kubevirt-cr.yaml
 curl -L -o virtctl https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/virtctl-${KUBEVIRT_VERSION}-linux-amd64
 chmod +x virtctl
+kubectl get pods -n kubevirt
+
+https://github.com/gardener/machine-controller-manager/blob/master/docs/design/README.md
 
 ## to investigate
 

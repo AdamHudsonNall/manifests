@@ -1,8 +1,2 @@
-approvers:
-- munnerz
-- simonswine
-- kragniz
-reviewers:
-- munnerz
-- unguiculus
-- kragniz
+labels:
+- area/deploy

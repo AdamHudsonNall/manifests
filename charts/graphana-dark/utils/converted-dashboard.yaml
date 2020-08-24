@@ -1,0 +1,350 @@
+apiVersion: k8s.kevingomez.fr/v1
+kind: GrafanaDashboard
+metadata:
+  name: test-dashboard
+  namespace: default
+folder: General
+spec:
+  title: Kubernetes / API server
+  editable: false
+  shared_crosshair: false
+  tags:
+  - kubernetes-mixin
+  auto_refresh: 10s
+  time:
+  - now-1h
+  - now
+  timezone: ""
+  tags_annotations: []
+  variables:
+  - query:
+      name: cluster
+      label: ""
+      datasource: $datasource
+      request: label_values(apiserver_request_total, cluster)
+      include_all: false
+      default_all: false
+  - query:
+      name: instance
+      label: ""
+      datasource: $datasource
+      request: label_values(apiserver_request_total{job="apiserver", cluster="$cluster"},
+        instance)
+      include_all: true
+      default_all: true
+  rows:
+  - name: Overview
+    panels:
+    - single_stat:
+        title: Up
+        span: 2
+        datasource: $datasource
+        unit: none
+        value_type: min
+        sparkline: ""
+        targets:
+        - prometheus:
+            query: sum(up{job="apiserver", cluster="$cluster"})
+            ref: A
+        thresholds:
+        - ""
+        - ""
+        colors:
+        - '#299c46'
+        - rgba(237, 129, 40, 0.89)
+        - '#d44a3a'
+    - graph:
+        title: RPC Rate
+        span: 5
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: sum(rate(apiserver_request_total{job="apiserver", instance=~"$instance",code=~"2..",
+              cluster="$cluster"}[5m]))
+            legend: 2xx
+            ref: A
+        - prometheus:
+            query: sum(rate(apiserver_request_total{job="apiserver", instance=~"$instance",code=~"3..",
+              cluster="$cluster"}[5m]))
+            legend: 3xx
+            ref: B
+        - prometheus:
+            query: sum(rate(apiserver_request_total{job="apiserver", instance=~"$instance",code=~"4..",
+              cluster="$cluster"}[5m]))
+            legend: 4xx
+            ref: C
+        - prometheus:
+            query: sum(rate(apiserver_request_total{job="apiserver", instance=~"$instance",code=~"5..",
+              cluster="$cluster"}[5m]))
+            legend: 5xx
+            ref: D
+        axes:
+          left:
+            hidden: false
+            unit: ops
+            log_base: 1
+          right:
+            hidden: false
+            unit: ops
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: Request duration 99th quantile
+        span: 5
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",
+              instance=~"$instance", verb!="WATCH", cluster="$cluster"}[5m])) by (verb,
+              le))
+            legend: '{{verb}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: s
+            log_base: 1
+          right:
+            hidden: false
+            unit: s
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+        legend: [as_table, to_the_right, current]
+    - graph:
+        title: Work Queue Add Rate
+        span: 6
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: sum(rate(workqueue_adds_total{job="apiserver", instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance, name)
+            legend: '{{instance}} {{name}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: ops
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: ops
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+        legend: [hide]
+    - graph:
+        title: Work Queue Depth
+        span: 6
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: sum(rate(workqueue_depth{job="apiserver", instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance, name)
+            legend: '{{instance}} {{name}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+        legend: [hide]
+    - graph:
+        title: Work Queue Latency
+        span: 12
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: histogram_quantile(0.99, sum(rate(workqueue_queue_duration_seconds_bucket{job="apiserver",
+              instance=~"$instance", cluster="$cluster"}[5m])) by (instance, name,
+              le))
+            legend: '{{instance}} {{name}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: s
+            log_base: 1
+          right:
+            hidden: false
+            unit: s
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+        legend: [as_table, to_the_right, current]
+    - graph:
+        title: ETCD Cache Entry Total
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: etcd_helper_cache_entry_total{job="apiserver", instance=~"$instance",
+              cluster="$cluster"}
+            legend: '{{instance}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: ETCD Cache Hit/Miss Rate
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: sum(rate(etcd_helper_cache_hit_total{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance)
+            legend: '{{instance}} hit'
+            ref: A
+        - prometheus:
+            query: sum(rate(etcd_helper_cache_miss_total{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance)
+            legend: '{{instance}} miss'
+            ref: B
+        axes:
+          left:
+            hidden: false
+            unit: ops
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: ops
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: ETCD Cache Duration 99th Quantile
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: histogram_quantile(0.99,sum(rate(etcd_request_cache_get_duration_seconds_bucket{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance, le))
+            legend: '{{instance}} get'
+            ref: A
+        - prometheus:
+            query: histogram_quantile(0.99,sum(rate(etcd_request_cache_add_duration_seconds_bucket{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}[5m])) by (instance, le))
+            legend: '{{instance}} miss'
+            ref: B
+        axes:
+          left:
+            hidden: false
+            unit: s
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: s
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: Memory
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: process_resident_memory_bytes{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}
+            legend: '{{instance}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: bytes
+            log_base: 1
+          right:
+            hidden: false
+            unit: bytes
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: CPU usage
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: rate(process_cpu_seconds_total{job="apiserver",instance=~"$instance",
+              cluster="$cluster"}[5m])
+            legend: '{{instance}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          right:
+            hidden: false
+            unit: short
+            min: 0
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
+    - graph:
+        title: Goroutines
+        span: 4
+        datasource: $datasource
+        targets:
+        - prometheus:
+            query: go_goroutines{job="apiserver",instance=~"$instance", cluster="$cluster"}
+            legend: '{{instance}}'
+            ref: A
+        axes:
+          left:
+            hidden: false
+            unit: short
+            log_base: 1
+          right:
+            hidden: false
+            unit: short
+            log_base: 1
+          bottom:
+            hidden: false
+            unit: ""
+            log_base: 0
